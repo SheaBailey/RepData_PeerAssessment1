@@ -1,25 +1,143 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+#Loading and processing the data
+
+```{R,echo=TRUE}
+data<-read.csv("activity.csv")
+```
+
+#What is mean total number of steps taken per day?
+
+```{R,echo=TRUE}
+#remove na's
+data_no_na<-data[!is.na(data$steps),]
+
+#Group the steps per day
+steps_perday<-aggregate(data_no_na$steps, list(data_no_na$date), sum)
+colnames(steps_perday)<-c("Date","Steps")
+
+#Plot histogram
+hist(steps_perday$Steps, main="Histogram of total steps per day", xlab = "Steps per day")
 
 
-## Loading and preprocessing the data
+mean_steps<-mean(steps_perday$Steps, na.rm=TRUE)
+median_steps<-median(steps_perday$Steps, na.rm=TRUE)
+
+mean_steps
+median_steps
+```
+
+#What is the average daily activity pattern?
+
+```{R}
+#Find mean for each interval
+five_min_avg<-aggregate(steps~interval, data = data, mean, na.rm=TRUE)
+
+#plot time series graph
+plot(five_min_avg$interval, five_min_avg$steps, type="l", main="Time series for 5min intervals", ylab="Avg steps per 5min intervals", xlab="Intervals")
+
+#Find max steps, then loop to find the interval
+max_steps <- max(five_min_avg$steps)
+for (i in 1:288) 
+{
+    if (five_min_avg$steps[i] == max_steps)
+        five_minute_interval_at_max_steps <- five_min_avg$interval[i]
+}
+five_minute_interval_at_max_steps
 
 
+```
 
-## What is mean total number of steps taken per day?
+#What is the average daily activity pattern?
 
+```{R}
+library(ggplot2)
+subdata = data[!is.na(data$steps), ]  
 
+steps_per_interval <- aggregate(subdata$steps, 
+                                by = list(interval = as.factor(subdata$interval)),
+                                FUN=mean, na.rm=TRUE)
+                        
+steps_per_interval$interval <- 
+        as.integer(levels(steps_per_interval$interval)[steps_per_interval$interval])
 
-## What is the average daily activity pattern?
+colnames(steps_per_interval) <- c("interval", "steps")
+            
+ggplot(data=steps_per_interval, aes(x=interval, y=steps)) + 
+    geom_line()
 
+max_interval <- steps_per_interval[which.max(steps_per_interval$steps),]
+max_interval
+```
+#Imputing missing values
 
+```{R}
+total_na <- 0
+for (i in 1:17568)
+{
+    if(is.na(data$steps[i])) 
+        total_na <- total_na+1 
+}
+total_na
 
-## Imputing missing values
+activity_filled_in <- data
+for (i in 1:17568) 
+{
+    if(is.na(activity_filled_in$steps[i]))  
+    { 
+        five_minute_pointer <- activity_filled_in$interval[i] 
+        for (j in 1:288)  
+        {
+            if (five_min_avg$interval[j] == five_minute_pointer) 
+                activity_filled_in$steps[i] <- five_min_avg$steps[j] 
 
+        }
+    }
+}
 
+total_steps_each_day_filled_in <- aggregate(steps~date, data=activity_filled_in, FUN=sum, na.rm=TRUE)
 
-## Are there differences in activity patterns between weekdays and weekends?
+hist(total_steps_each_day_filled_in$steps)
+
+total_steps_each_day_mean_filled_in <- mean(total_steps_each_day_filled_in$steps)
+total_steps_each_day_median_filled_in <- median(total_steps_each_day_filled_in$steps)
+
+total_steps_each_day_mean_filled_in
+total_steps_each_day_median_filled_in
+```
+
+#Are there differences in activity patterns between weekdays and weekends?
+
+```{R}
+library(lubridate)
+
+week <- wday(activity_filled_in$date)
+week_day <- week
+for (i in 1:17568) 
+{
+    if(week[i] == 1)
+        week_day[i] <- 'weekend'
+    if(week[i] == 2)
+        week_day[i] <- 'weekday'
+    if(week[i] == 3)
+        week_day[i] <- 'weekday'
+    if(week[i] == 4)
+        week_day[i] <- 'weekday'
+    if(week[i] == 5)
+        week_day[i] <- 'weekday'
+    if(week[i] == 6)
+        week_day[i] <- 'weekday'
+    if(week[i] == 7)
+        week_day[i] <- 'weekend'
+}
+
+activity_filled_in$weekday <-week_day
+
+weekday <- grep("weekday",activity_filled_in$weekday)
+weekday_frame <- activity_filled_in[weekday,]
+weekend_frame <- activity_filled_in[-weekday,]
+
+five_minutes_average_weekday <- aggregate(steps~interval, data=weekday_frame, FUN=mean, na.rm=TRUE)
+five_minutes_average_weekend <- aggregate(steps~interval, data=weekend_frame, FUN=mean, na.rm=TRUE)
+
+plot(x = five_minutes_average_weekday$interval, y = five_minutes_average_weekday$steps, type = "l") 
+plot(x = five_minutes_average_weekend$interval, y = five_minutes_average_weekend$steps, type = "l") 
+```
